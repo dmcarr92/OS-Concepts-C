@@ -94,28 +94,28 @@ int main() {
 	
 	pthread_t *reader_threads = malloc(sizeof(pthread_t) * r);
 	pthread_t *writer_threads = malloc(sizeof(pthread_t) * w);
-	thread_info *reader_info = malloc(sizeof(thread_info));
-	thread_info *writer_info = malloc(sizeof(thread_info));
+	thread_info reader_info[10];
+	thread_info writer_info[10];
 	
-	reader_info->type = READER;
-	reader_info->id_number = 0;
-	reader_info->delay_ms = R;
-	strcpy(reader_info->filepathout, fullfilepath_out);
-	
-	writer_info->type = WRITER;
-	writer_info->id_number = 0;
-	writer_info->delay_ms = W;
-	strcpy(writer_info->filepathout, fullfilepath_out);
-
 	int i;
-	printf("Just about to create reader and writer threads\n");
-
 	for (i = 0; i < r; i++) {
-		printf("%d\n", i);
-		reader_info->id_number = i + 1;
-		writer_info->id_number = i + 1;
-		pthread_create(&reader_threads[i], NULL, reader, (void *)reader_info);
-		pthread_create(&writer_threads[i], NULL, writer, (void *)writer_info);
+		reader_info[i].type = READER;
+		reader_info[i].id_number = i + 1;
+		reader_info[i].delay_ms = R;
+		strcpy(reader_info[i].filepathout, fullfilepath_out);
+
+		writer_info[i].type = WRITER;
+		writer_info[i].id_number = i + 1;
+		writer_info[i].delay_ms = W;
+		strcpy(writer_info[i].filepathout, fullfilepath_out);
+	}
+	thread_info *temp_reader = malloc(sizeof(thread_info));
+	thread_info *temp_writer = malloc(sizeof(thread_info));
+	for (i = 0; i < r; i++) {
+		temp_reader = &reader_info[i];
+		temp_writer = &writer_info[i];
+		pthread_create(&reader_threads[i], NULL, reader, (void *)temp_reader);
+		pthread_create(&writer_threads[i], NULL, writer, (void *)temp_writer);
 		pthread_join(reader_threads[i], NULL);
 		pthread_join(writer_threads[i], NULL);
 	}
@@ -129,7 +129,6 @@ int main() {
 void *reader(void *reader_info) {
 	
 	thread_info *info;
-	info = malloc(sizeof(thread_info));
 	info = (thread_info *)reader_info;
 	int i;
 	int j;
@@ -141,6 +140,7 @@ void *reader(void *reader_info) {
 		readers_inside++;
 		fprintf(Google_Drive, ">>> DB value read =: 0%d:%d by reader number: %d\n", *db_time_seconds, *db_time_milliseconds, info->id_number);
 		printf(">>> DB value read =: 0%d:%d by reader number: %d\n", *db_time_seconds, *db_time_milliseconds, info->id_number);
+		printf("readers inside = %d\nwriters waiting = %d\n", readers_inside, writers_waiting);
 		readers_inside--;
 		
 
@@ -160,7 +160,7 @@ void *writer(void *writer_info) {
 		for (j = 0; j < info->delay_ms; j++) millisleep(1);			// delay
 		if (readers_inside != 0 || writers_waiting != 0 || writer_inside) {					// if the db is NOT EMPTY
 			writers_waiting++;									// announce that there is a writer waiting
-			pthread_cond_wait(&admit_writer, &mutex);						// wait
+			pthread_cond_wait(&admit_writer, &mutex);		// wait
 			writers_waiting--;
 		}
 		writer_inside = true;										// announce that there is a writer inside
